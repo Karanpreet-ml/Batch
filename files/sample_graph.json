@@ -1,0 +1,244 @@
+{
+  "nodes": [
+    {
+      "file_path": "src/utils/logger.py",
+      "language": "python",
+      "import_count": 0,
+      "imported_by_count": 5
+    },
+    {
+      "file_path": "src/utils/config.py",
+      "language": "python",
+      "import_count": 0,
+      "imported_by_count": 5
+    },
+    {
+      "file_path": "src/core/base_model.py",
+      "language": "python",
+      "import_count": 1,
+      "imported_by_count": 1
+    },
+    {
+      "file_path": "src/core/database.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 5
+    },
+    {
+      "file_path": "src/auth/login.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 1
+    },
+    {
+      "file_path": "src/auth/signup.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/auth/tokens.py",
+      "language": "python",
+      "import_count": 1,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/billing/invoice.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 3
+    },
+    {
+      "file_path": "src/billing/payment.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 1
+    },
+    {
+      "file_path": "src/billing/refund.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/reports/generator.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 1
+    },
+    {
+      "file_path": "src/reports/export.py",
+      "language": "python",
+      "import_count": 1,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/notifications/email.py",
+      "language": "python",
+      "import_count": 2,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/notifications/sms.py",
+      "language": "python",
+      "import_count": 1,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/notifications/push.py",
+      "language": "python",
+      "import_count": 1,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/misc/standalone_script.py",
+      "language": "python",
+      "import_count": 0,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/misc/orphan_tool.py",
+      "language": "python",
+      "import_count": 0,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "README.md",
+      "language": "markdown",
+      "import_count": 0,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "package-lock.json",
+      "language": "json",
+      "import_count": 0,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "dist/bundle.min.js",
+      "language": "javascript",
+      "import_count": 0,
+      "imported_by_count": 0
+    },
+    {
+      "file_path": "src/frontend/app.jsx",
+      "language": "javascript",
+      "import_count": 1,
+      "imported_by_count": 1
+    },
+    {
+      "file_path": "src/frontend/api.js",
+      "language": "javascript",
+      "import_count": 1,
+      "imported_by_count": 2
+    },
+    {
+      "file_path": "src/frontend/dashboard.jsx",
+      "language": "javascript",
+      "import_count": 2,
+      "imported_by_count": 0
+    }
+  ],
+  "edges": [
+    {
+      "source": "src/core/base_model.py",
+      "target": "src/utils/logger.py"
+    },
+    {
+      "source": "src/core/database.py",
+      "target": "src/utils/logger.py"
+    },
+    {
+      "source": "src/core/database.py",
+      "target": "src/utils/config.py"
+    },
+    {
+      "source": "src/auth/login.py",
+      "target": "src/core/database.py"
+    },
+    {
+      "source": "src/auth/login.py",
+      "target": "src/utils/logger.py"
+    },
+    {
+      "source": "src/auth/signup.py",
+      "target": "src/core/database.py"
+    },
+    {
+      "source": "src/auth/signup.py",
+      "target": "src/auth/login.py"
+    },
+    {
+      "source": "src/auth/tokens.py",
+      "target": "src/utils/config.py"
+    },
+    {
+      "source": "src/billing/invoice.py",
+      "target": "src/core/database.py"
+    },
+    {
+      "source": "src/billing/invoice.py",
+      "target": "src/core/base_model.py"
+    },
+    {
+      "source": "src/billing/payment.py",
+      "target": "src/billing/invoice.py"
+    },
+    {
+      "source": "src/billing/payment.py",
+      "target": "src/core/database.py"
+    },
+    {
+      "source": "src/billing/refund.py",
+      "target": "src/billing/payment.py"
+    },
+    {
+      "source": "src/billing/refund.py",
+      "target": "src/billing/invoice.py"
+    },
+    {
+      "source": "src/reports/generator.py",
+      "target": "src/core/database.py"
+    },
+    {
+      "source": "src/reports/generator.py",
+      "target": "src/billing/invoice.py"
+    },
+    {
+      "source": "src/reports/export.py",
+      "target": "src/reports/generator.py"
+    },
+    {
+      "source": "src/notifications/email.py",
+      "target": "src/utils/logger.py"
+    },
+    {
+      "source": "src/notifications/email.py",
+      "target": "src/utils/config.py"
+    },
+    {
+      "source": "src/notifications/sms.py",
+      "target": "src/utils/logger.py"
+    },
+    {
+      "source": "src/notifications/push.py",
+      "target": "src/utils/config.py"
+    },
+    {
+      "source": "src/frontend/app.jsx",
+      "target": "src/frontend/api.js"
+    },
+    {
+      "source": "src/frontend/api.js",
+      "target": "src/utils/config.py"
+    },
+    {
+      "source": "src/frontend/dashboard.jsx",
+      "target": "src/frontend/app.jsx"
+    },
+    {
+      "source": "src/frontend/dashboard.jsx",
+      "target": "src/frontend/api.js"
+    }
+  ]
+}
