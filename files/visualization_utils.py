@@ -54,7 +54,7 @@ def build_figure(
     state: AlgorithmState,
     pos: Dict[str, Tuple[float, float]],
     selected_node: Optional[str] = None,
-    hover_neighbors: Optional[Set[str]] = None,
+    hover_neighbors: Optional[Set[str]] = set(),
 ) -> go.Figure:
     hidden = state.hidden_nodes
     visible_nodes = [n for n in G.nodes if n not in hidden]
@@ -109,7 +109,14 @@ def build_figure(
         status = state.node_status.get(n, "reviewable")
         batch_id = None
         for bid, b in state.batches.items():
-            if n in b["files"] or n in b["context_files"]:
+            if n in b["files"]:
+                batch_id = bid
+                break
+            for cf in b["context_files"]:
+                if n == cf:
+                    batch_id = bid
+                    break
+            if batch_id is not None:
                 batch_id = bid
                 break
         token_count = data.get("token_count", deterministic_token_count(n))

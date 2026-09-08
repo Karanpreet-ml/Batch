@@ -331,7 +331,8 @@ class BatchingAlgorithm:
             mean = sum(counts) / len(counts)
             variance = sum((c - mean) ** 2 for c in counts) / len(counts)
             std = math.sqrt(variance)
-            threshold = max(5, int(round(mean + 2 * std)))
+            threshold = max(5, int(round(mean + 2 * std / max(1, self.params.max_tokens_per_batch)))
+            )
         self.params.hub_threshold = threshold
 
         highlighted_edges = []
@@ -361,7 +362,7 @@ class BatchingAlgorithm:
         for n in candidates:
             neighbors = (set(self.G.predecessors(n)) | set(self.G.successors(n))) - self.hubs
             neighbors &= candidates
-            if len(neighbors) == 0:
+            if len(neighbors) <= 1:
                 self.isolated.add(n)
 
         self._snapshot(
@@ -414,6 +415,10 @@ class BatchingAlgorithm:
         raw_communities: List[Set[str]] = []
         if working_sub.number_of_nodes() > 0:
             try:
+                raw_communities = [
+                    set(c) for c in
+                    nx.algorithms.community.louvain_communities(working_sub, seed=42)
+                ]
                 raw_communities = [
                     set(c) for c in
                     nx.algorithms.community.louvain_communities(working_sub, seed=42)

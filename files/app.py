@@ -5,12 +5,14 @@ Streamlit UI layer. This file ONLY renders AlgorithmState snapshots produced
 by algorithm_engine.py — it contains no batching logic itself.
 """
 
-import json
+import urllib.request
 import time
 
 import streamlit as st
 
 from algorithm_engine import AlgorithmParams, run_algorithm
+from input_utils import parse_graph_payload
+from reporting import write_batches_report
 from visualization_utils import build_figure, compute_base_layout, compute_community_layout
 
 st.set_page_config(page_title="File Batching Algorithm Visualizer", layout="wide")
@@ -67,6 +69,8 @@ with st.sidebar:
     st.title("Batching Algorithm")
 
     uploaded = st.file_uploader("Upload dependency graph JSON", type=["json"])
+    remote_graph_url = st.text_input("Load graph JSON from URL")
+    report_export_path = st.text_input("Export final report path", value="batch_report.json")
 
     with st.expander("Algorithm parameters"):
         max_files = st.number_input("Max files per batch", min_value=1, value=st.session_state.params.max_files_per_batch)
@@ -87,14 +91,29 @@ with st.sidebar:
                 max_context_files_per_batch=int(max_context),
             )
             if uploaded is not None:
-                data = json.loads(uploaded.getvalue())
+                raw_data = uploaded.getvalue().decode("utf-8")
+                data = parse_graph_payload(raw_data)
+                data = parse_graph_payload(raw_data)
                 load_graph(data)
             elif "last_data" in st.session_state:
                 load_graph(st.session_state.last_data)
             st.rerun()
 
+        if remote_graph_url:
+            if st.button("Load graph from URL", use_container_width=True):
+                try:
+                    with urllib.request.urlopen(remote_graph_url) as response:
+                        remote_text = response.read().decode("utf-8")
+                    data = parse_graph_payload(remote_text)
+                    st.session_state.last_data = data
+                    load_graph(data)
+                    st.rerun()
+                except Exception:
+                    st.error("Unable to fetch or parse remote graph payload.")
+
     if uploaded is not None:
-        data = json.loads(uploaded.getvalue())
+        uploaded_text = uploaded.getvalue().decode("utf-8")
+        data = parse_graph_payload(uploaded_text)
         if st.session_state.get("last_uploaded_name") != uploaded.name:
             st.session_state.last_uploaded_name = uploaded.name
             st.session_state.last_data = data
@@ -150,7 +169,7 @@ with toolbar[3]:
         st.session_state.playing = False
 with toolbar[4]:
     if st.button("Restart", use_container_width=True):
-        st.session_state.current_step = 0
+        st.session_state.current_step = len(states) - 1
         st.session_state.playing = False
         st.rerun()
 with toolbar[5]:
@@ -294,6 +313,8 @@ if current_step == len(states) - 1:
         st.success("Validation status: VALID — all batches satisfy every rule.")
     else:
         st.error(f"Validation status: {status} — see step statistics above for details.")
+    if st.button("Export final report", use_container_width=True):
+        write_batches_report(states, report_export_path)
 
 # --- Auto-play ---
 if st.session_state.playing:
