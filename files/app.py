@@ -12,6 +12,15 @@ import streamlit as st
 
 from algorithm_engine import AlgorithmParams, run_algorithm
 from visualization_utils import build_figure, compute_base_layout, compute_community_layout
+from batch_tools import (
+    apply_custom_filter,
+    compute_batch_health,
+    compute_neighbor_overlap,
+    export_snapshot,
+    find_cross_community_duplicates,
+    summarize_batches,
+    top_n_largest_files,
+)
 
 st.set_page_config(page_title="File Batching Algorithm Visualizer", layout="wide")
 
@@ -101,6 +110,32 @@ with st.sidebar:
             load_graph(data)
 
     st.divider()
+
+    if st.session_state.states:
+        with st.expander("Advanced tools"):
+            filter_expr = st.text_input(
+                "Custom filter expression",
+                placeholder='e.g. imported_by_count > 5',
+                key="filter_expr",
+            )
+            if st.button("Apply filter", use_container_width=True) and filter_expr:
+                G = st.session_state.graph
+                node_data = {n: G.nodes[n] for n in G.nodes}
+                matches = apply_custom_filter(list(G.nodes), node_data, filter_expr)
+                st.session_state["filter_matches"] = matches
+            if "filter_matches" in st.session_state:
+                st.caption(f"{len(st.session_state['filter_matches'])} file(s) matched")
+                for f in st.session_state["filter_matches"][:20]:
+                    st.write(f"- {f}")
+
+            export_name = st.text_input("Export filename", value="snapshot.json", key="export_name")
+            if st.button("Export current snapshot", use_container_width=True):
+                current_state = st.session_state.states[st.session_state.current_step]
+                path = export_snapshot(
+                    {"step": current_state.step_name, "batches": current_state.batches},
+                    export_name,
+                )
+                st.success(f"Saved to {path}")
 
     if st.session_state.states:
         st.caption("Algorithm steps")
@@ -294,6 +329,28 @@ if current_step == len(states) - 1:
         st.success("Validation status: VALID — all batches satisfy every rule.")
     else:
         st.error(f"Validation status: {status} — see step statistics above for details.")
+
+    with st.expander("Advanced batch analytics"):
+        node_data = {n: G.nodes[n] for n in G.nodes}
+        health = compute_batch_health(
+            state.batches,
+            st.session_state.params.max_files_per_batch,
+            st.session_state.params.max_tokens_per_batch,
+        )
+        st.write("Batch health:", health)
+
+        summary = summarize_batches(state.batches)
+        st.write("Summary:", summary)
+
+        largest = top_n_largest_files(node_data, n=5)
+        st.write("Top largest files:", largest)
+
+        dupes = find_cross_community_duplicates(state.communities)
+        st.write("Cross-community duplicates:", dupes)
+
+        sample_nodes = list(G.nodes)[:15]
+        overlap = compute_neighbor_overlap(G, sample_nodes)
+        st.write("Neighbor overlap (sample):", overlap)
 
 # --- Auto-play ---
 if st.session_state.playing:
