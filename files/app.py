@@ -10,7 +10,7 @@ import time
 
 import streamlit as st
 
-from algorithm_engine import AlgorithmParams, run_algorithm
+from algorithm_engine import AlgorithmParams, export_batches, run_algorithm
 from visualization_utils import build_figure, compute_base_layout, compute_community_layout
 
 st.set_page_config(page_title="File Batching Algorithm Visualizer", layout="wide")
@@ -241,6 +241,7 @@ with col_details:
             chosen_b = st.selectbox("Batch", batch_ids, key=f"batch_select_{current_step}")
             b = state.batches[chosen_b]
             st.write(f"Batch ID: {chosen_b}")
+            st.write(f"Batch type: {b.get('batch_type', '—')}")
             st.write(f"Total files: {b['total_files']}")
             st.write(f"Total tokens: {b['total_tokens']}")
             st.write(f"Validation: {b['validation']}")
@@ -289,6 +290,12 @@ if current_step == len(states) - 1:
     for i, (label, key) in enumerate(labels):
         with cols[i % 4]:
             st.metric(label, stats.get(key, "—"))
+    st.download_button(
+        "Download batches JSON",
+        data=json.dumps(export_batches(states), indent=2),
+        file_name="batches.json",
+        mime="application/json",
+    )
     status = stats.get("validation_status", "UNKNOWN")
     if status == "VALID":
         st.success("Validation status: VALID — all batches satisfy every rule.")
