@@ -128,6 +128,7 @@ STATUS_COLORS = {
     "isolated": "#9e9e9e",
     "working": "#8ab4f8",
     "context": "#fb8c00",
+    "oversized": "#6d4c41",
     "batch": "#1e88e5",
 }
 
@@ -209,6 +210,7 @@ class BatchingAlgorithm:
         self.filter_reason: Dict[str, str] = {}
         self.hubs: Set[str] = set()
         self.isolated: Set[str] = set()
+        self.oversized: Set[str] = set()
         self.working_nodes: Set[str] = set()
         self.communities: Dict[str, Set[str]] = {}
         self.community_of: Dict[str, str] = {}
@@ -237,6 +239,8 @@ class BatchingAlgorithm:
         for n in self.G.nodes:
             if n in self.filter_reason:
                 status[n] = f"filtered_{self.filter_reason[n]}"
+            elif n in self.oversized:
+                status[n] = "oversized"
             elif n in self.hubs:
                 status[n] = "hub"
             elif n in self.isolated:
@@ -302,6 +306,13 @@ class BatchingAlgorithm:
             else:
                 self.reviewable.add(n)
 
+        # Oversized files cannot fit in any batch; they get their own batch later.
+        oversized_limit = self.params.max_tokens_per_batch * 1.5
+        for n in list(self.reviewable):
+            if self.G.nodes[n]["token_count"] > oversized_limit:
+                self.oversized.add(n)
+                self.reviewable.discard(n)
+
         self._snapshot(
             step_index=0,
             hidden=set(),
@@ -311,6 +322,7 @@ class BatchingAlgorithm:
                 "why": "Generated code, configuration, and documentation files are not meaningful "
                        "units for code review batching, so they are excluded up front.",
                 "changed": f"{len(self.filter_reason)} files were filtered out; "
+                           f"{len(self.oversized)} oversized; "
                            f"{len(self.reviewable)} remain reviewable.",
                 "next": "Detect 'hub' files that are imported by an unusually large number of other files.",
             },
@@ -318,12 +330,14 @@ class BatchingAlgorithm:
                 "total_files": total,
                 "filtered_files": len(self.filter_reason),
                 "reviewable_files": len(self.reviewable),
+                "oversized_files": len(self.oversized),
             },
         )
 
     # ---- Step 1 -------------------------------------------------------------
 
     def _step1_hub_detection(self):
+        auto_detected = self.params.hub_threshold is None
         if self.params.hub_threshold is not None:
             threshold = self.params.hub_threshold
         else:
@@ -351,7 +365,7 @@ class BatchingAlgorithm:
                 "changed": f"{len(self.hubs)} files marked as hubs and moved to shared context.",
                 "next": "Find isolated files with no meaningful dependency relationships.",
             },
-            stats={"hub_threshold": threshold, "hub_count": len(self.hubs)},
+            stats={"hub_threshold": threshold, "hub_threshold_auto": auto_detected, "hub_count": len(self.hubs)},
         )
 
     # ---- Step 2 -------------------------------------------------------------
@@ -591,19 +605,25 @@ class BatchingAlgorithm:
 
     # ---- Step 7 -------------------------------------------------------------
 
+    def _context_for(self, members: Set[str]) -> Set[str]:
+        """Hub files adjacent to `members`, capped, never overlapping members."""
+        context_files: Set[str] = set()
+        cap = self.params.max_context_files_per_batch
+        for m in sorted(members):
+            if len(context_files) >= cap:
+                break
+            neighbors = set(self.G.predecessors(m)) | set(self.G.successors(m))
+            for hub in sorted(neighbors & self.hubs):
+                if len(context_files) >= cap:
+                    break
+                context_files.add(hub)
+        return context_files - members
+
     def _step7_context_injection(self):
         self.batches = {}
         for i, (cid, members) in enumerate(self.communities.items()):
             bid = f"B{i}"
-            context_files: Set[str] = set()
-            for m in members:
-                if len(context_files) >= self.params.max_context_files_per_batch:
-                    break
-                neighbors = set(self.G.predecessors(m)) | set(self.G.successors(m))
-                for hub in neighbors & self.hubs:
-                    context_files.add(hub)
-                    if len(context_files) >= self.params.max_context_files_per_batch:
-                        break
+            context_files = self._context_for(members)
             tokens = sum(self.G.nodes[m]["token_count"] for m in members)
             self.batches[bid] = {
                 "files": sorted(list(members)),
@@ -611,9 +631,24 @@ class BatchingAlgorithm:
                 "total_files": len(members),
                 "total_tokens": tokens,
                 "validation": "pending",
+                "batch_type": "community",
+                "forced_oversized": False,
             }
             for m in members:
                 self.node_batch[m] = bid
+
+        for f in sorted(self.oversized):
+            bid = f"B{len(self.batches)}"
+            self.batches[bid] = {
+                "files": [f],
+                "context_files": sorted(self._context_for({f})),
+                "total_files": 1,
+                "total_tokens": self.G.nodes[f]["token_count"],
+                "validation": "pending",
+                "batch_type": "oversized",
+                "forced_oversized": True,
+            }
+            self.node_batch[f] = bid
 
         color_override = {}
         for hub_set_batch in self.batches.values():
@@ -670,6 +705,8 @@ class BatchingAlgorithm:
                     "total_files": 1,
                     "total_tokens": f_tokens,
                     "validation": "pending",
+                    "batch_type": "community",
+                    "forced_oversized": False,
                 }
                 self.node_batch[f] = bid
                 new_batches += 1
@@ -710,12 +747,15 @@ class BatchingAlgorithm:
         duplicate_files = []
         limit_violations = []
         context_issues = []
+        missing_type = [bid for bid, b in self.batches.items() if not b.get("batch_type")]
 
         for bid, b in self.batches.items():
             for f in b["files"]:
                 if f in all_batched:
                     duplicate_files.append(f)
                 all_batched.add(f)
+            if b.get("forced_oversized"):
+                continue  # oversized batches are exempt from limits by design
             if b["total_files"] > self.params.max_files_per_batch:
                 limit_violations.append((bid, "file_count"))
             if b["total_tokens"] > self.params.max_tokens_per_batch:
@@ -730,7 +770,8 @@ class BatchingAlgorithm:
             len(unassigned) == 0 and
             len(duplicate_files) == 0 and
             len(limit_violations) == 0 and
-            len(context_issues) == 0
+            len(context_issues) == 0 and
+            len(missing_type) == 0
         )
 
         for bid, b in self.batches.items():
@@ -777,6 +818,25 @@ class BatchingAlgorithm:
             },
             color_override=color_override,
         )
+
+
+# --------------------------------------------------------------------------
+# Export
+# --------------------------------------------------------------------------
+
+def export_batches(states: List[AlgorithmState]) -> Dict[str, Any]:
+    """Serialise the final batches into the downstream JSON schema."""
+    final = states[-1]
+    batches = []
+    for bid, b in final.batches.items():
+        batches.append({
+            "batch_id": int(bid[1:]),
+            "batch_type": b.get("batch_type"),
+            "target_files": b["files"],
+            "context_files": b["context_files"],
+            "total_tokens": b["total_tokens"],
+        })
+    return {"batches": batches}
 
 
 # --------------------------------------------------------------------------
